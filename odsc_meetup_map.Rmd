@@ -38,40 +38,30 @@ get.data <- function(x, cities){
   names <- c()
   
   for(i in x){
-    name <- i %>% html_node('h1') %>%
-      html_text(trim=T)
+    name <- i %>% html_node('h1') %>% html_text(trim=T)
     names <- c(names, name)
     members <- i %>% html_node('#C_metabox :nth-child(1) .hoverLink .align-right') %>% html_text(trim=T)
     num.members <- c(num.members, as.numeric(gsub(',','',members)))
-    title <- i %>% html_node('.flush--bottom') %>%
-          html_text(trim=T)
+    title <- i %>% html_node('.flush--bottom') %>%        html_text(trim=T)
     next.meetup.title <- c(next.meetup.title, title)
     url <- i %>% html_node('.flush--bottom') %>%
           html_nodes(xpath = "./a") %>%  
           html_attr("href")
     next.meetup.url <-  c(next.meetup.url, url)
-    date <- i %>% html_node('.date') %>%
-          html_text(trim=T)
-    time <- i %>% html_node('.time') %>%
-          html_text(trim=T)
+    date <- i %>% html_node('.date') %>% html_text(trim=T)
+    time <- i %>% html_node('.time') %>% html_text(trim=T)
     date <- paste(date, time, sep = ' ')
-    print(date)
     next.date <- c(next.date, date)
 
     past.title <- i %>% html_node('#recentMeetups :nth-child(1)
-                                 .event-title') %>%
-                       html_text(trim=T)
+                                 .event-title') %>%                    html_text(trim=T)
     past.meetup.title <- c(past.meetup.title, past.title)
     past.url <- i %>% html_node('#recentMeetups :nth-child(1)
-                                .event-title') %>% 
-                      html_attr("href")
+                                .event-title') %>%                   html_attr("href")
     past.meetup.url <- c(past.meetup.url, past.url)
     
-    p.date <- i %>% html_node('#recentMeetups .flush--bottom') %>%                          html_text(trim=T)
+    p.date <- i %>% html_node('#recentMeetups .flush--bottom') %>%  html_text(trim=T)
     p.date <- gsub('[^A-z0-9_: ]', '', p.date)
-    #p.date <-  paste(p.date[[1]][1], p.date[[1]][2], p.date[[1]][4],
-    #                 sep = ' ')
-    print(p.date)
     past.date <- c(past.date,p.date)
   }
   data <- data.frame(cities, names, num.members, past.date,
@@ -133,9 +123,9 @@ data.f1 <- reactive({
 output$text <-   renderText({
   value <- toString(data.f1())
   name <- paste0("<br/>",
-                     "<font size='4'>",
-                      value,
-                      "</font>")
+                 "<font size='4'>", 
+                 value, 
+                 "</font>")
 })
 htmlOutput('text')
 ```
