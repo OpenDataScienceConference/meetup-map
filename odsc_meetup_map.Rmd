@@ -1,0 +1,187 @@
+---
+title: "ODSC Meetups"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(leaflet)
+library(shiny)
+library(rvest)
+
+longs <- c(-0.1, -74.0059, -71.0589, -122.4194, -87.629798)
+lats <- c(51.5117, 40.7128, 42.3601, 37.7749, 41.8781)
+cities <- c('London', 'New York City', 'Boston', 
+            'San Francisco', 'Chicago')
+places <- data.frame(cities, lats, longs)
+
+bos <- read_html("http://www.meetup.com/Boston-Data-Mining/")
+ny <- read_html("http://www.meetup.com/New-York-ODSC/")
+sf <- read_html("http://www.meetup.com/San-Francisco-ODSC/")
+ldn <- read_html("http://www.meetup.com/London-ODSC/")
+chi <- read_html("http://www.meetup.com/Chicago-Data-Science-ODSC/")
+
+meetups <- list(ldn, ny, bos, sf, chi)
+
+get.data <- function(x, cities){
+  num.members <- c()
+  next.meetup.title <- c()
+  next.meetup.url <-  c()
+  next.date <- c()
+  past.meetup.title <- c()
+  past.meetup.url <- c()
+  past.date <- c()
+  names <- c()
+  
+  for(i in x){
+    name <- i %>% html_node('h1') %>%
+      html_text(trim=T)
+    names <- c(names, name)
+    members <- i %>% html_node('#C_metabox :nth-child(1) .hoverLink .align-right') %>% html_text(trim=T)
+    num.members <- c(num.members, as.numeric(gsub(',','',members)))
+    title <- i %>% html_node('.flush--bottom') %>%
+          html_text(trim=T)
+    next.meetup.title <- c(next.meetup.title, title)
+    url <- i %>% html_node('.flush--bottom') %>%
+          html_nodes(xpath = "./a") %>%  
+          html_attr("href")
+    next.meetup.url <-  c(next.meetup.url, url)
+    date <- i %>% html_node('.date') %>%
+          html_text(trim=T)
+    time <- i %>% html_node('.time') %>%
+          html_text(trim=T)
+    date <- paste(date, time, sep = ' ')
+    print(date)
+    next.date <- c(next.date, date)
+
+    past.title <- i %>% html_node('#recentMeetups :nth-child(1)
+                                 .event-title') %>%
+                       html_text(trim=T)
+    past.meetup.title <- c(past.meetup.title, past.title)
+    past.url <- i %>% html_node('#recentMeetups :nth-child(1)
+                                .event-title') %>% 
+                      html_attr("href")
+    past.meetup.url <- c(past.meetup.url, past.url)
+    
+    p.date <- i %>% html_node('#recentMeetups .flush--bottom') %>%                          html_text(trim=T)
+    p.date <- gsub('[^A-z0-9_: ]', '', p.date)
+    #p.date <-  paste(p.date[[1]][1], p.date[[1]][2], p.date[[1]][4],
+    #                 sep = ' ')
+    print(p.date)
+    past.date <- c(past.date,p.date)
+  }
+  data <- data.frame(cities, names, num.members, past.date,
+                     next.meetup.title, next.meetup.url,
+                     next.date, past.meetup.title, 
+                     past.meetup.url)
+  return(data)
+}
+
+data <- get.data(meetups, cities)
+data <- merge(data, places, by = 'cities')
+data$labels <- paste(data$cities,
+                paste(data$num.members, 'Members'), 
+                sep = '<br/>')
+```
+
+Column {data-width=650}
+-----------------------------------------------------------------------
+
+### Meetup Map
+
+```{r}
+output$map <- renderLeaflet({
+
+leaflet(data = data) %>%
+  addTiles() %>%
+  addMarkers(lng = ~longs, 
+             lat = ~lats, 
+             popup = ~labels,
+             layerId = ~cities)
+  })
+
+click_marker <- eventReactive(input$map_marker_click, {
+  x <- input$map_marker_click$id
+  return(x)})
+
+check_click = function() {
+  ifelse(!is.null(input$map_marker_click), 
+         click_marker(),
+         'Boston')
+}
+
+city <- reactive({check_click()})
+
+leafletOutput('map')
+```
+
+Column {data-width=350}
+----------------------------------------------------------------------
+
+###Meetup
+
+```{r}
+data.f1 <- reactive({
+  result <- as.character(data[data$cities == city(),2])
+  return(result)
+})
+
+output$text <-   renderText({
+  value <- toString(data.f1())
+  name <- paste0("<br/>",
+                     "<font size='4'>",
+                      value,
+                      "</font>")
+})
+htmlOutput('text')
+```
+
+### Next Meetup
+
+```{r}
+data.f2 <- reactive({
+  return(data[data$cities == city(),])
+})
+output$text.next <- renderText({
+ hyperlink <- paste0("<br/><a href='",
+                      toString(data.f2()$next.meetup.url),
+                      "'>",
+                     "<font size='4'>",
+                      toString(data.f2()$next.meetup.title),
+                      "</font></a>")
+ 
+ date <- paste("<font size='4'>", 
+              toString(data.f2()$next.date),
+              "</font></a>")
+ result <- paste(hyperlink,date, sep ='<br/><br/>')
+})
+  
+htmlOutput('text.next')
+```
+
+### Previous Meetup
+
+```{r}
+data.f3 <- reactive({
+  return(data[data$cities == city(),])
+})
+output$text.past <- renderText({
+  hyperlink <- paste0("<br/><a href='",
+                      toString(data.f3()$past.meetup.url),
+                      "'>",
+                      "<font size='4'>",
+                      toString(data.f3()$past.meetup.title),
+                      "</font></a>")
+  date <- paste("<font size='4'>", 
+              toString(data.f3()$past.date),
+              "</font></a>")
+  result <- paste(hyperlink,date, sep ='<br/><br/>')
+})
+htmlOutput('text.past')
+```
+
+
