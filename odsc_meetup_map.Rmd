@@ -12,22 +12,57 @@ library(flexdashboard)
 library(leaflet)
 library(shiny)
 library(rvest)
+library(xml2)
 
-longs <- c(-0.1, -74.0059, -71.0589, -122.4194, -87.629798)
-lats <- c(51.5117, 40.7128, 42.3601, 37.7749, 41.8781)
-cities <- c('London', 'New York City', 'Boston', 
-            'San Francisco', 'Chicago')
+longs <- c(-0.1, 
+           -74.0059, 
+           -71.0589, 
+           -122.4194, 
+           -87.629798,
+           -77.036871,
+           139.691706,
+           77.594563,
+           100.501765,
+           -122.143019,
+           -71)
+
+lats <- c(51.5117, 
+          40.7128, 
+          42.3601, 
+          37.7749, 
+          41.8781,
+          38.907192,
+          35.689487,
+          12.971599,
+          13.756331,
+          37.441883,
+          42)
+
+cities <- c('London', 'New York City', 'Boston 1.0', 
+            'San Francisco', 'Chicago', 'Washington D.C', 
+            'Tokyo', 'Bangalore', 'Bangkok', 'Palo Alto',
+            'Boston 2.0')
 places <- data.frame(cities, lats, longs)
 
-bos <- read_html("http://www.meetup.com/Boston-Data-Mining/")
-ny <- read_html("http://www.meetup.com/New-York-ODSC/")
-sf <- read_html("http://www.meetup.com/San-Francisco-ODSC/")
-ldn <- read_html("http://www.meetup.com/London-ODSC/")
-chi <- read_html("http://www.meetup.com/Chicago-Data-Science-ODSC/")
+urls <- c("http://www.meetup.com/London-ODSC/",
+          "http://www.meetup.com/New-York-ODSC/",
+          "http://www.meetup.com/Boston-Data-Mining/",
+          "http://www.meetup.com/San-Francisco-ODSC/",
+          "http://www.meetup.com/Chicago-Data-Science-ODSC/",
+          'http://www.meetup.com/D-C-Data-Science-ODSC/',
+          'http://www.meetup.com/Tokyo-Data-Science-ODSC/',
+          'http://www.meetup.com/Bangalore-Data-Science-ODSC/',
+          'http://www.meetup.com/Bangkok-Data-Science-ODSC/',
+          'http://www.meetup.com/Silicon-Valley-ODSC/',
+          'http://www.meetup.com/open-source-data-science/')
 
-meetups <- list(ldn, ny, bos, sf, chi)
+places.urls <- structure(urls, 
+                         names=cities, 
+                         class="vector")
+meetups <- lapply(X = urls, read_html)
+names(meetups) <- cities
 
-get.data <- function(x, cities){
+get.data <- function(x, cities.urls){
   num.members <- c()
   next.meetup.title <- c()
   next.meetup.url <-  c()
@@ -36,6 +71,7 @@ get.data <- function(x, cities){
   past.meetup.url <- c()
   past.date <- c()
   names <- c()
+  count = 1
   
   for(i in x){
     name <- i %>% html_node('h1') %>% html_text(trim=T)
@@ -47,6 +83,9 @@ get.data <- function(x, cities){
     url <- i %>% html_node('.flush--bottom') %>%
           html_nodes(xpath = "./a") %>%  
           html_attr("href")
+    url <- ifelse(test = length(url) > 0,
+                  yes = url,
+                  no = cities.urls[[count]])
     next.meetup.url <-  c(next.meetup.url, url)
     date <- i %>% html_node('.date') %>% html_text(trim=T)
     time <- i %>% html_node('.time') %>% html_text(trim=T)
@@ -63,19 +102,53 @@ get.data <- function(x, cities){
     p.date <- i %>% html_node('#recentMeetups .flush--bottom') %>%  html_text(trim=T)
     p.date <- gsub('[^A-z0-9_: ]', '', p.date)
     past.date <- c(past.date,p.date)
+    
+    count = count + 1
   }
-  data <- data.frame(cities, names, num.members, past.date,
+
+  print(length(next.meetup.url))
+  print(next.meetup.url)
+  data <- data.frame(names(cities.urls), names, 
+                     num.members, past.date, 
                      next.meetup.title, next.meetup.url,
                      next.date, past.meetup.title, 
-                     past.meetup.url)
+                     past.meetup.url,
+                     stringsAsFactors=FALSE)
+    data[data$next.date == 'NA NA', 'next.meetup.title'] <- 'To Be Announced'
+  data[data$next.date == 'NA NA', 'next.date'] <- ''
+  
   return(data)
 }
 
-data <- get.data(meetups, cities)
+data <- get.data(meetups, places.urls)
+names(data)[1] <- 'cities'
 data <- merge(data, places, by = 'cities')
 data$labels <- paste(data$cities,
                 paste(data$num.members, 'Members'), 
                 sep = '<br/>')
+
+#Placeholders until new meetups start going
+
+data[data$cities=='Tokyo', 'past.date'] <- ''
+data[data$cities=='Tokyo', 'past.meetup.title'] <- 'Not Available'
+data[data$cities=='Tokyo', 'past.meetup.url'] <- 'http://www.meetup.com/Tokyo-Data-Science-ODSC/'
+
+data[data$cities=='Bangalore', 'past.date'] <- ''
+data[data$cities=='Bangalore', 'past.meetup.title'] <- 'Work in Progress'
+data[data$cities=='Bangalore', 'past.meetup.url'] <- 'http://www.meetup.com/Bangalore-Data-Science-ODSC/'
+data[data$cities=='Bangalore', 'next.date'] <- 'If you\'re interesting in hosting a meetup, please contact odsc@meetup.com.'
+data[data$cities=='Bangalore', 'next.meetup.title'] <- 'Work in Progress'
+data[data$cities=='Bangalore', 'next.meetup.url'] <- 'http://www.meetup.com/Bangalore-Data-Science-ODSC/'
+
+data[data$cities=='Bangkok', 'past.date'] <- ''
+data[data$cities=='Bangkok', 'past.meetup.title'] <- 'Work in Progress'
+data[data$cities=='Bangkok', 'past.meetup.url'] <- 'http://www.meetup.com/Bangkok-Data-Science-ODSC/'
+data[data$cities=='Bangkok', 'next.date'] <- 'If you\'re interesting in hosting a meetup, please contact odsc@meetup.com.'
+data[data$cities=='Bangkok', 'next.meetup.title'] <- 'Work in Progress'
+data[data$cities=='Bangkok', 'next.meetup.url'] <- 'http://www.meetup.com/Bangkok-Data-Science-ODSC/'
+
+tot.mems <- sum(data$num.members)
+
 ```
 
 Column {data-width=650}
@@ -101,7 +174,7 @@ click_marker <- eventReactive(input$map_marker_click, {
 check_click = function() {
   ifelse(!is.null(input$map_marker_click), 
          click_marker(),
-         'Boston')
+         'Boston 2.0')
 }
 
 city <- reactive({check_click()})
@@ -112,19 +185,36 @@ leafletOutput('map')
 Column {data-width=350}
 ----------------------------------------------------------------------
 
+###ODSC Meetup Stats
+
+```{r}
+output$text0 <-   renderText({
+  name <- paste0("<br/>",
+                 "<font size='4'>", 
+                 "Worldwide Meetup Members: ",
+                 tot.mems,
+                 "</font>")
+})
+htmlOutput('text0')
+```
+
 ###Meetup
 
 ```{r}
 data.f1 <- reactive({
-  result <- as.character(data[data$cities == city(),2])
-  return(result)
+  name <- as.character(data[data$cities == city(),2])
+  mems <- as.character(data[data$cities == city(),3])
+  return(c(name, mems))
 })
 
 output$text <-   renderText({
-  value <- toString(data.f1())
-  name <- paste0("<br/>",
-                 "<font size='4'>", 
-                 value, 
+  name <- toString(data.f1()[1])
+  mems <- toString(data.f1()[2])
+  name <- paste0("<font size='4'>", 
+                 name, 
+                 "<br/>",
+                 mems,
+                 " Members",
                  "</font>")
 })
 htmlOutput('text')
@@ -137,7 +227,7 @@ data.f2 <- reactive({
   return(data[data$cities == city(),])
 })
 output$text.next <- renderText({
- hyperlink <- paste0("<br/><a href='",
+ hyperlink <- paste0("<a href='",
                       toString(data.f2()$next.meetup.url),
                       "'>",
                      "<font size='4'>",
@@ -160,7 +250,7 @@ data.f3 <- reactive({
   return(data[data$cities == city(),])
 })
 output$text.past <- renderText({
-  hyperlink <- paste0("<br/><a href='",
+  hyperlink <- paste0("<a href='",
                       toString(data.f3()$past.meetup.url),
                       "'>",
                       "<font size='4'>",
